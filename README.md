@@ -81,10 +81,11 @@ Crie um arquivo `.env` na raiz com as variáveis necessárias, por exemplo:
 LLM_API_KEY="sua-chave"
 LLM_PROVIDER="openai"
 LLM_MODEL="gpt-4.1-mini"
+# Opcional para proxies/self-host: LLM_BASE_URL="https://api.openai.com/v1/chat/completions"
 ```
 
 Os scripts carregarão essas variáveis automaticamente (`python-dotenv`). Configure temperatura `0.0`
-e `top_p=1.0` para reprodutibilidade.
+e `top_p=1.0` para reprodutibilidade. Caso utilize um proxy ou Azure OpenAI, ajuste `LLM_BASE_URL`.
 
 ## Fluxo de trabalho da POC
 
@@ -93,11 +94,14 @@ e `top_p=1.0` para reprodutibilidade.
    ```bash
    python scripts/make_ab_pairs.py --in data/curated/temas_seed.jsonl --out data/curated/ab_pairs.jsonl
    ```
-3. Rode o avaliador e experimento:
+3. Rode o avaliador e experimento (saída principal em Markdown, CSV opcional para análises):
    ```bash
-   python -m undogmatic.eval_ab --in data/curated/ab_pairs.jsonl --report reports/ab_test.md
+   python -m undogmatic.eval_ab --in data/curated/ab_pairs.jsonl --report reports/ab_test.md --csv reports/ab_results.csv
    ```
 4. Consulte `reports/ab_test.md` e os artefatos em `runs/<data>/` para análise completa.
+
+> `scripts/run_ab_test.py` permanece no repositório apenas por retrocompatibilidade; utilize o comando
+> `python -m undogmatic.eval_ab` descrito acima como caminho canônico.
 
 ## Testes
 

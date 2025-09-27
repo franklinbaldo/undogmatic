@@ -96,6 +96,7 @@ class LLMScorer:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
         log_dir: Path | str | None = None,
         max_retries: int = 2,
     ) -> None:
@@ -103,6 +104,7 @@ class LLMScorer:
         self.provider = provider or os.getenv("LLM_PROVIDER", "openai")
         self.model = model or os.getenv("LLM_MODEL")
         self.api_key = api_key or os.getenv("LLM_API_KEY")
+        self.base_url = base_url or os.getenv("LLM_BASE_URL")
         self.log_dir = Path(log_dir or "runs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.max_retries = max_retries
@@ -117,7 +119,7 @@ class LLMScorer:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
         if not self.api_key or not self.model:
             raise ValueError("LLM_API_KEY and LLM_MODEL must be set for OpenAI provider")
-        return OpenAIChatClient(api_key=self.api_key, model=self.model)
+        return OpenAIChatClient(api_key=self.api_key, model=self.model, base_url=self.base_url)
 
     def score_text(self, text: str, *, metadata: Optional[Dict[str, Any]] = None) -> ScoreResult:
         system_prompt = prompts.SYSTEM_PROMPT
