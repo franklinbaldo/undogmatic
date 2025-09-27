@@ -46,8 +46,9 @@ undogmatic/
 │   └── make_ab_pairs.py     # transforma teses em variantes A/B
 ├── data/
 │   └── curated/
-│       ├── temas_seed.jsonl # amostra manual
-│       └── ab_pairs.jsonl   # saídas do script make_ab_pairs
+│       ├── temas_seed.jsonl      # amostra manual
+│       ├── ab_pairs.jsonl        # saídas do script make_ab_pairs
+│       └── control_samples.jsonl # frases neutras/hubristas p/ ancoragem
 ├── reports/
 │   └── ab_test.md           # resumo do experimento
 ├── tests/
@@ -90,6 +91,7 @@ e `top_p=1.0` para reprodutibilidade. Caso utilize um proxy ou Azure OpenAI, aju
 ## Fluxo de trabalho da POC
 
 1. Revise `data/curated/temas_seed.jsonl` (o repositório já inclui 12 teses STF/STJ como ponto de partida) e ajuste conforme necessário.
+   Para sanity check rápido, utilize também `data/curated/control_samples.jsonl`, que traz frases neutras, grounded e altamente hubristas para calibrar o avaliador.
 2. Gere pares A/B:
    ```bash
    python scripts/make_ab_pairs.py --in data/curated/temas_seed.jsonl --out data/curated/ab_pairs.jsonl
