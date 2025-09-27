@@ -88,7 +88,7 @@ e `top_p=1.0` para reprodutibilidade.
 
 ## Fluxo de trabalho da POC
 
-1. Preencha `data/curated/temas_seed.jsonl` manualmente (mínimo 10 casos).
+1. Revise `data/curated/temas_seed.jsonl` (o repositório já inclui 12 teses STF/STJ como ponto de partida) e ajuste conforme necessário.
 2. Gere pares A/B:
    ```bash
    python scripts/make_ab_pairs.py --in data/curated/temas_seed.jsonl --out data/curated/ab_pairs.jsonl
