@@ -6,6 +6,7 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha1
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol
 from uuid import uuid4
@@ -107,6 +108,8 @@ class LLMScorer:
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
         self.log_dir = Path(log_dir or "runs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_dir = self.log_dir / "cache"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.max_retries = max_retries
 
         if client is not None:
@@ -127,6 +130,19 @@ class LLMScorer:
         attempts = 0
         raw_response: str | None = None
         parsed: ScoreResult | None = None
+
+        cached = self._read_cache(text)
+        if cached is not None:
+            self._log_interaction(
+                system_prompt,
+                user_prompt,
+                None,
+                cached,
+                metadata,
+                success=True,
+                cache_hit=True,
+            )
+            return cached
 
         while attempts <= self.max_retries:
             raw_response = self.client.complete(system=system_prompt, user=user_prompt)
@@ -150,6 +166,7 @@ class LLMScorer:
                 continue
 
         assert parsed is not None  # for type checkers
+        self._write_cache(text, parsed)
         self._log_interaction(
             system_prompt,
             user_prompt,
@@ -170,6 +187,7 @@ class LLMScorer:
         *,
         success: bool,
         error: Optional[str] = None,
+        cache_hit: bool = False,
     ) -> LoggedInteraction:
         timestamp = datetime.now(timezone.utc)
         date_dir = self.log_dir / timestamp.strftime("%Y%m%d")
@@ -197,6 +215,7 @@ class LLMScorer:
             "parsed": parsed.model_dump() if parsed else None,
             "success": success,
             "error": error,
+            "cache_hit": cache_hit,
         }
         prompt_path.write_text(
             json.dumps(prompt_payload, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -206,6 +225,32 @@ class LLMScorer:
         )
         return LoggedInteraction(
             directory=entry_dir, prompt_path=prompt_path, response_path=response_path
+        )
+
+    def _cache_path(self, text: str) -> Path:
+        digest = sha1(text.encode("utf-8")).hexdigest()
+        return self.cache_dir / f"{digest}.json"
+
+    def _read_cache(self, text: str) -> ScoreResult | None:
+        cache_path = self._cache_path(text)
+        if not cache_path.exists():
+            return None
+        try:
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            return ScoreResult.model_validate(payload)
+        except (OSError, json.JSONDecodeError, ValidationError):
+            # Corrupted cache entries are ignored and removed to avoid repeated failures.
+            try:
+                cache_path.unlink()
+            except OSError:
+                pass
+            return None
+
+    def _write_cache(self, text: str, result: ScoreResult) -> None:
+        cache_path = self._cache_path(text)
+        cache_payload = result.model_dump()
+        cache_path.write_text(
+            json.dumps(cache_payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
 

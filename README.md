@@ -25,7 +25,8 @@ do STF/STJ.
 2. **Geração A/B** (`scripts/make_ab_pairs.py`): cria pares `authority_only` vs. `explained_only`
 para cada tese.
 3. **ShameScore por LLM** (`undogmatic/llm_scorer.py`): envia o texto para um modelo de linguagem
-com um prompt ancorado em PT-BR e retorna `shame_score`, `confidence` e `rationale`.
+   com um prompt ancorado em PT-BR e retorna `shame_score`, `confidence` e `rationale`. As respostas
+   válidas são armazenadas em cache (`runs/cache/<sha1>.json`) para evitar chamadas repetidas.
 4. **Experimento pareado** (`undogmatic/eval_ab.py`): compara a distribuição do score entre os dois
 estilos e aplica Wilcoxon + tamanho de efeito.
 5. **Relatório** (`reports/ab_test.md`): consolida tabelas, gráficos e interpretação.
@@ -98,7 +99,8 @@ e `top_p=1.0` para reprodutibilidade. Caso utilize um proxy ou Azure OpenAI, aju
    ```bash
    python -m undogmatic.eval_ab --in data/curated/ab_pairs.jsonl --report reports/ab_test.md --csv reports/ab_results.csv
    ```
-4. Consulte `reports/ab_test.md` e os artefatos em `runs/<data>/` para análise completa.
+4. Consulte `reports/ab_test.md` e os artefatos em `runs/<data>/` para análise completa. Reutilize o
+   cache automático (`runs/cache/`) sempre que repetir o mesmo texto para economizar créditos.
 
 > `scripts/run_ab_test.py` permanece no repositório apenas por retrocompatibilidade; utilize o comando
 > `python -m undogmatic.eval_ab` descrito acima como caminho canônico.

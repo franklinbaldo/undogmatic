@@ -61,6 +61,8 @@ parsing fails.
 3. Call the provider with deterministic parameters (temperature 0.0, top_p 1.0).
 4. Parse JSON into a Pydantic model.
 5. Persist logs under `runs/YYYYMMDD/ID/` (prompt, raw response, parsed result).
+6. Cache successful responses as `runs/cache/<sha1>.json` keyed by the input text to avoid
+   unnecessary repeated calls.
 
 ### 3.3 Evaluation pipeline
 
@@ -100,8 +102,8 @@ power until more theses are added.
 multi-provider checks are necessary safeguards.
 - **Prompt gaming:** Although the prompt warns against hedge-spam, models might still be fooled by
 well-crafted rhetoric. Future work includes adversarial examples and human evaluation.
-- **Cost and latency:** API calls for every variant can be expensive. Distilling the signal into a
-cheaper embedding-based regressor is an optional follow-up (P5).
+- **Cost and latency:** API calls for every variant can be expensive. The scorer now caches hashes of
+  previous inputs to reuse results, but large batches will still benefit from distillation (P5).
 
 ## 6. Roadmap
 
