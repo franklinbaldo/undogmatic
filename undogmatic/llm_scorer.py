@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha1
@@ -11,8 +13,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Protocol
 from uuid import uuid4
 
-import requests
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 
 from . import prompts
@@ -37,7 +37,7 @@ class OpenAIChatClient:
         self.model = model
         self.base_url = base_url or "https://api.openai.com/v1/chat/completions"
         self.timeout = timeout
-        self._session = requests.Session()
+        self._opener = urllib.request.build_opener()
 
     def complete(self, *, system: str, user: str) -> str:  # pragma: no cover - thin wrapper
         payload = {
@@ -54,14 +54,22 @@ class OpenAIChatClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-        response = self._session.post(
+        request = urllib.request.Request(
             self.base_url,
-            json=payload,
+            data=json.dumps(payload).encode("utf-8"),
             headers=headers,
-            timeout=self.timeout,
+            method="POST",
         )
-        response.raise_for_status()
-        data = response.json()
+        try:
+            with self._opener.open(request, timeout=self.timeout) as response:
+                body = response.read()
+        except urllib.error.HTTPError as exc:  # pragma: no cover - passthrough
+            raise RuntimeError(
+                f"OpenAI API request failed with status {exc.code}"
+            ) from exc
+        except urllib.error.URLError as exc:  # pragma: no cover - passthrough
+            raise RuntimeError("OpenAI API request failed") from exc
+        data = json.loads(body.decode("utf-8"))
         return data["choices"][0]["message"]["content"]
 
 
@@ -87,6 +95,24 @@ class LoggedInteraction:
     response_path: Path
 
 
+def load_env_file(path: Path | str | None = None) -> None:
+    """Minimal loader for .env-style key=value pairs."""
+
+    env_path = Path(path or ".env")
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
 class LLMScorer:
     """High-level interface for computing ShameScores via an LLM."""
 
@@ -101,7 +127,7 @@ class LLMScorer:
         log_dir: Path | str | None = None,
         max_retries: int = 2,
     ) -> None:
-        load_dotenv()
+        load_env_file()
         self.provider = provider or os.getenv("LLM_PROVIDER", "openai")
         self.model = model or os.getenv("LLM_MODEL")
         self.api_key = api_key or os.getenv("LLM_API_KEY")

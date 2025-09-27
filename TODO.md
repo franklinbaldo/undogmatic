@@ -14,7 +14,7 @@
 ## P1) Dataset mínimo (em andamento)
 - [x] Montar `data/curated/temas_seed.jsonl` (10–30 teses) a partir das páginas oficiais do STF/STJ.
 - [x] Gerar pares A/B com `scripts/make_ab_pairs.py` → `data/curated/ab_pairs.jsonl`.
-- [ ] Registrar amostras de controle (frases neutras/hubristas) para checar ancoragem do avaliador.
+- [x] Registrar amostras de controle (frases neutras/hubristas) para checar ancoragem do avaliador.
 
 ## P2) LLM-Scorer
 - [x] Implementar `LLMScorer.score_text` com prompts ancorados, retries de parsing e logging em `runs/YYYYMMDD/...`.
