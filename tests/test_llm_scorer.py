@@ -6,8 +6,8 @@ from typing import Iterable
 
 import pytest
 
-from undogmatic.llm_scorer import LLMScorer, ScoreParsingError
 from undogmatic import prompts
+from undogmatic.llm_scorer import LLMScorer, ScoreParsingError
 
 
 class QueueClient:
@@ -63,3 +63,18 @@ def test_score_text_raises_after_exhausting_retries(tmp_path: Path) -> None:
 
     with pytest.raises(ScoreParsingError):
         scorer.score_text("falha", metadata={"id": "fail"})
+
+
+def test_score_text_uses_cache(tmp_path: Path) -> None:
+    payload = {"shame_score": 55, "confidence": 65, "rationale": "Referência vazia."}
+    text = "Tema 999"
+
+    scorer = LLMScorer(client=QueueClient([json.dumps(payload)]), log_dir=tmp_path)
+    first = scorer.score_text(text)
+
+    assert first.shame_score == 55
+
+    cached_scorer = LLMScorer(client=QueueClient([]), log_dir=tmp_path)
+    second = cached_scorer.score_text(text)
+
+    assert second.shame_score == 55
