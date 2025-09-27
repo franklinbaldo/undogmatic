@@ -30,8 +30,8 @@ com um prompt ancorado em PT-BR e retorna `shame_score`, `confidence` e `rationa
 estilos e aplica Wilcoxon + tamanho de efeito.
 5. **Relatório** (`reports/ab_test.md`): consolida tabelas, gráficos e interpretação.
 
-> Nota: Os módulos `patterns.py` e `scoring.py` continuam no repositório como legado e serão
-> descontinuados após a migração completa para o avaliador via LLM.
+> Nota: A versão atual já removeu o pipeline legado de regex/lexicons. O módulo
+> `undogmatic.llm_scorer` é a fonte de verdade para o ShameScore.
 
 ## Estrutura esperada do repositório
 

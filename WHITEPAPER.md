@@ -85,10 +85,12 @@ hubristic ones (“Este tema encerra definitivamente a questão.”) to verify t
 
 ## 4. Implementation status
 
-The repository currently contains legacy rule-based modules (`patterns.py`, `scoring.py`) from an
-earlier iteration. They will be deprecated once the LLM scorer and evaluation scripts are merged.
-The `TODO.md` file outlines the migration plan (P0–P7), including CLI integration and optional
-embedding distillation for cheaper batch scoring.
+The codebase now ships the LLM-centric components described above: `undogmatic/llm_scorer.py`
+encapsulates prompt rendering, provider calls, JSON parsing, and logging; `undogmatic/eval_ab.py`
+implements the paired experiment; and `scripts/make_ab_pairs.py` converts curated theses into A/B
+variants. The previous rule-based modules were removed to keep the surface area focused on the new
+workflow. The `TODO.md` file mantém o roadmap (P0–P7) com extensões futuras, incluindo CLI
+consolidada e distilação opcional para embeddings.
 
 ## 5. Limitations
 
