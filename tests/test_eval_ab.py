@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pandas as pd
+
+from undogmatic.eval_ab import ABPair, compute_summary, run, score_pairs
+from undogmatic.llm_scorer import LLMScorer
+
+
+class StaticClient:
+    def __init__(self, score: float) -> None:
+        payload = json.dumps({"shame_score": score, "confidence": 90, "rationale": "ok"})
+        self.responses = [payload, payload, payload, payload]
+
+    def complete(self, *, system: str, user: str) -> str:  # pragma: no cover - deterministic
+        return self.responses.pop(0)
+
+
+def test_score_pairs_creates_csv(tmp_path: Path) -> None:
+    scorer = LLMScorer(client=StaticClient(50.0), log_dir=tmp_path)
+    pairs = [ABPair(id="X", authority_only="A", explained_only="B")]
+    df, csv_path = score_pairs(pairs, scorer, run_label="unit-test")
+
+    assert csv_path.exists()
+    assert "unit-test" in csv_path.name
+    assert isinstance(df, pd.DataFrame)
+    assert df.loc[0, "delta"] == 0
+
+
+def test_compute_summary_handles_empty_dataframe() -> None:
+    empty_df = pd.DataFrame()
+    summary = compute_summary(empty_df)
+    assert pd.isna(summary.authority_mean)
+    assert pd.isna(summary.rank_biserial)
+
+
+def test_run_writes_report_and_csv(tmp_path: Path) -> None:
+    ab_path = tmp_path / "pairs.jsonl"
+    ab_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"id": "1", "authority_only": "A", "explained_only": "B"}),
+                json.dumps({"id": "2", "authority_only": "C", "explained_only": "D"}),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    report_path = tmp_path / "report.md"
+    csv_path = tmp_path / "results.csv"
+    scorer = LLMScorer(client=StaticClient(40.0), log_dir=tmp_path / "runs")
+
+    df, summary, generated_csv = run(
+        ab_path,
+        report_path=report_path,
+        csv_path=csv_path,
+        scorer=scorer,
+        run_label="integration",
+    )
+
+    assert report_path.exists()
+    assert csv_path.exists()
+    assert generated_csv.exists()
+    assert len(df) == 2
+    assert summary.authority_mean == summary.explained_mean == 40.0
