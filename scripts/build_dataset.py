@@ -9,7 +9,7 @@ from typing import Iterable, List, TypedDict
 
 from bs4 import BeautifulSoup
 
-from undogmatic.patterns import normalize_text, remove_authority_markers
+from undogmatic.utils import cleanse_tese, normalize_whitespace
 
 
 class TemaRecord(TypedDict):
@@ -36,7 +36,7 @@ def parse_stf_html(path: pathlib.Path) -> Iterable[TemaRecord]:
             tese_node = link.find_next("p")
             if tese_node is None:
                 continue
-            tese = normalize_text(_extract_text(tese_node))
+            tese = normalize_whitespace(_extract_text(tese_node))
             yield {
                 "court": "STF",
                 "tema": tema,
@@ -58,7 +58,7 @@ def parse_stj_html(path: pathlib.Path) -> Iterable[TemaRecord]:
             tese_node = header.find_next("p")
             if tese_node is None:
                 continue
-            tese = normalize_text(_extract_text(tese_node))
+            tese = normalize_whitespace(_extract_text(tese_node))
             link = header.find("a")
             url = link.get("href") if link else ""
             yield {
@@ -73,7 +73,7 @@ def build_ab_pairs(records: Iterable[TemaRecord]) -> List[dict]:
     ab_pairs = []
     for record in records:
         authority_only = f"{record['court']} Tema {record['tema']}"
-        explained_only = remove_authority_markers(record["tese"])
+        explained_only = cleanse_tese(record["tese"])
         ab_pairs.append(
             {
                 "id": f"{record['court']}-{record['tema']}",

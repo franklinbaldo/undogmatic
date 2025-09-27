@@ -5,22 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import re
 from typing import Iterable, Iterator
 
-THEME_PATTERN = re.compile(r"\bTema\s*(?:n[ºo]\s*)?\d{1,5}\b", flags=re.IGNORECASE)
-TRIBUNAL_PATTERN = re.compile(
-    r"\b(?:STF|STJ|Supremo Tribunal Federal|Superior Tribunal de Justiça)\b", flags=re.IGNORECASE
-)
-
-
-def cleanse_tese(text: str) -> str:
-    """Remove explicit tribunal/theme mentions while preserving substantive content."""
-
-    without_theme = THEME_PATTERN.sub("", text)
-    without_tribunal = TRIBUNAL_PATTERN.sub("", without_theme)
-    normalized = " ".join(without_tribunal.split())
-    return normalized.strip()
+from undogmatic.utils import cleanse_tese
 
 
 def load_seeds(path: pathlib.Path) -> Iterator[dict]:
