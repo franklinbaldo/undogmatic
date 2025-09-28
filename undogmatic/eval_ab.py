@@ -1,4 +1,4 @@
-"""A/B evaluation pipeline using the LLM-based ShameScore."""
+"""A/B evaluation pipeline for ShameScore, supporting multiple backends."""
 
 from __future__ import annotations
 
@@ -7,14 +7,31 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Callable, Iterable, List, Optional
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from .llm_scorer import LLMScorer
+
+def _get_scorer(backend: str) -> Callable:
+    """Dynamically import and return the appropriate scoring function."""
+    if backend == "embed":
+        from undogmatic.embed_scorer import score_text
+
+        return score_text
+    if backend == "llm":
+        from .llm_scorer import LLMScorer, ScoreResult
+
+        scorer_instance = LLMScorer()
+
+        def score_func(text: str, metadata: Optional[dict] = None) -> dict:
+            result: ScoreResult = scorer_instance.score_text(text, metadata=metadata)
+            return result.model_dump()
+
+        return score_func
+    raise SystemExit(f"Unknown backend: {backend}")
 
 
 @dataclass
@@ -56,36 +73,42 @@ def load_pairs(path: Path) -> List[ABPair]:
 
 def score_pairs(
     pairs: Iterable[ABPair],
-    scorer: LLMScorer,
+    scorer_func: Callable,
     *,
     run_label: Optional[str] = None,
+    log_dir: Path,
 ) -> tuple[pd.DataFrame, Path]:
     records = []
     for pair in pairs:
-        authority = scorer.score_text(
-            pair.authority_only,
-            metadata={"id": pair.id, "variant": "authority_only"},
-        )
-        explained = scorer.score_text(
-            pair.explained_only,
-            metadata={"id": pair.id, "variant": "explained_only"},
-        )
+        try:
+            authority_res = scorer_func(
+                pair.authority_only,
+                metadata={"id": pair.id, "variant": "authority_only"},
+            )
+            explained_res = scorer_func(
+                pair.explained_only,
+                metadata={"id": pair.id, "variant": "explained_only"},
+            )
+        except TypeError:
+            authority_res = scorer_func(pair.authority_only)
+            explained_res = scorer_func(pair.explained_only)
+
         records.append(
             {
                 "id": pair.id,
-                "authority_score": authority.shame_score,
-                "authority_confidence": authority.confidence,
-                "authority_rationale": authority.rationale,
-                "explained_score": explained.shame_score,
-                "explained_confidence": explained.confidence,
-                "explained_rationale": explained.rationale,
-                "delta": authority.shame_score - explained.shame_score,
+                "authority_score": authority_res["shame_score"],
+                "authority_confidence": authority_res["confidence"],
+                "authority_rationale": authority_res["rationale"],
+                "explained_score": explained_res["shame_score"],
+                "explained_confidence": explained_res["confidence"],
+                "explained_rationale": explained_res["rationale"],
+                "delta": authority_res["shame_score"] - explained_res["shame_score"],
             }
         )
 
     df = pd.DataFrame(records)
     timestamp = datetime.now(timezone.utc)
-    date_dir = scorer.log_dir / timestamp.strftime("%Y%m%d")
+    date_dir = log_dir / timestamp.strftime("%Y%m%d")
     date_dir.mkdir(parents=True, exist_ok=True)
     label = run_label or f"ab-{timestamp.strftime('%H%M%S')}-{uuid4().hex[:6]}"
     csv_path = date_dir / f"{label}-scores.csv"
@@ -142,21 +165,26 @@ def write_report(path: Path, summary: ExperimentSummary, pair_count: int) -> Non
 
 def run(
     input_path: Path,
+    backend: str,
     *,
     report_path: Optional[Path] = None,
     csv_path: Optional[Path] = None,
-    scorer: Optional[LLMScorer] = None,
     run_label: Optional[str] = None,
 ) -> tuple[pd.DataFrame, ExperimentSummary, Path]:
-    scorer = scorer or LLMScorer()
+    scorer_func = _get_scorer(backend)
+    log_dir = Path("runs")
+    log_dir.mkdir(exist_ok=True)
+
     pairs = load_pairs(input_path)
-    df, generated_csv = score_pairs(pairs, scorer, run_label=run_label)
+    df, generated_csv = score_pairs(pairs, scorer_func, run_label=run_label, log_dir=log_dir)
     summary = compute_summary(df)
+
     if report_path:
         write_report(report_path, summary, len(pairs))
     if csv_path:
         csv_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(csv_path, index=False)
+
     return df, summary, generated_csv
 
 
@@ -168,10 +196,14 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     parser.add_argument("--report", type=Path, help="Arquivo Markdown para resumo")
     parser.add_argument("--csv", type=Path, help="Caminho opcional para CSV detalhado")
     parser.add_argument("--run-label", type=str, help="Nome opcional para agrupar os logs")
+    parser.add_argument(
+        "--backend", default="embed", choices=["embed", "llm"], help="Scoring backend to use"
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     run(
         args.input_path,
+        backend=args.backend,
         report_path=args.report,
         csv_path=args.csv,
         run_label=args.run_label,
