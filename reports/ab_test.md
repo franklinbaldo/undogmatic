@@ -1,10 +1,12 @@
 # ShameScore A/B Test
 
-Este arquivo será preenchido após rodar `python -m undogmatic.eval_ab`.
-Inclua aqui:
+Quantidade de pares: 12
 
-- Data da execução e modelo utilizado.
-- Estatísticas do teste pareado (Wilcoxon, tamanho de efeito).
-- Observações qualitativas das justificativas do avaliador.
+| Métrica | Autoridade | Explicada |
+| --- | --- | --- |
+| Média | 50.667 | 49.417 |
+| Mediana | 50.500 | 48.500 |
 
-Enquanto não houver execução registrada, mantenha este lembrete.
+Teste de Wilcoxon: estatística=14.000, p-valor=0.0522.
+
+Tamanho de efeito (rank-biserial): 0.500.
