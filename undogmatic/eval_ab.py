@@ -30,6 +30,7 @@ def _get_scorer(backend: str) -> Callable:
             result: ScoreResult = scorer_instance.score_text(text, metadata=metadata)
             return result.model_dump()
 
+        score_func.log_dir = scorer_instance.log_dir  # type: ignore[attr-defined]
         return score_func
     raise SystemExit(f"Unknown backend: {backend}")
 
@@ -54,6 +55,16 @@ class ExperimentSummary:
     rank_biserial: float
 
 
+def _normalise_result(result: object) -> dict:
+    if hasattr(result, "model_dump"):
+        return getattr(result, "model_dump")()
+    if hasattr(result, "dict"):
+        return getattr(result, "dict")()
+    if isinstance(result, dict):
+        return result
+    raise TypeError("Unsupported score result payload")
+
+
 def load_pairs(path: Path) -> List[ABPair]:
     pairs: List[ABPair] = []
     with path.open("r", encoding="utf-8") as handle:
@@ -73,25 +84,35 @@ def load_pairs(path: Path) -> List[ABPair]:
 
 def score_pairs(
     pairs: Iterable[ABPair],
-    scorer_func: Callable,
+    scorer: Callable,
     *,
     run_label: Optional[str] = None,
-    log_dir: Path,
+    log_dir: Optional[Path] = None,
 ) -> tuple[pd.DataFrame, Path]:
+    if hasattr(scorer, "score_text"):
+        scorer_func = getattr(scorer, "score_text")
+        default_log_dir = Path(getattr(scorer, "log_dir", "runs"))
+    else:
+        scorer_func = scorer
+        default_log_dir = Path("runs")
+
     records = []
     for pair in pairs:
         try:
-            authority_res = scorer_func(
+            authority_raw = scorer_func(
                 pair.authority_only,
                 metadata={"id": pair.id, "variant": "authority_only"},
             )
-            explained_res = scorer_func(
+            explained_raw = scorer_func(
                 pair.explained_only,
                 metadata={"id": pair.id, "variant": "explained_only"},
             )
         except TypeError:
-            authority_res = scorer_func(pair.authority_only)
-            explained_res = scorer_func(pair.explained_only)
+            authority_raw = scorer_func(pair.authority_only)
+            explained_raw = scorer_func(pair.explained_only)
+
+        authority_res = _normalise_result(authority_raw)
+        explained_res = _normalise_result(explained_raw)
 
         records.append(
             {
@@ -108,7 +129,9 @@ def score_pairs(
 
     df = pd.DataFrame(records)
     timestamp = datetime.now(timezone.utc)
-    date_dir = log_dir / timestamp.strftime("%Y%m%d")
+    resolved_log_dir = Path(log_dir) if log_dir is not None else default_log_dir
+    resolved_log_dir.mkdir(parents=True, exist_ok=True)
+    date_dir = resolved_log_dir / timestamp.strftime("%Y%m%d")
     date_dir.mkdir(parents=True, exist_ok=True)
     label = run_label or f"ab-{timestamp.strftime('%H%M%S')}-{uuid4().hex[:6]}"
     csv_path = date_dir / f"{label}-scores.csv"
@@ -165,18 +188,30 @@ def write_report(path: Path, summary: ExperimentSummary, pair_count: int) -> Non
 
 def run(
     input_path: Path,
-    backend: str,
+    backend: str = "embed",
     *,
     report_path: Optional[Path] = None,
     csv_path: Optional[Path] = None,
     run_label: Optional[str] = None,
+    scorer: Optional[Callable] = None,
 ) -> tuple[pd.DataFrame, ExperimentSummary, Path]:
-    scorer_func = _get_scorer(backend)
-    log_dir = Path("runs")
-    log_dir.mkdir(exist_ok=True)
+    scorer_func = scorer or _get_scorer(backend)
+    log_dir_attr = getattr(scorer_func, "log_dir", None)
+    if log_dir_attr is not None:
+        log_dir = Path(log_dir_attr)
+    elif hasattr(scorer_func, "score_text"):
+        log_dir = Path(getattr(scorer_func, "log_dir", "runs"))
+    else:
+        log_dir = Path("runs")
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     pairs = load_pairs(input_path)
-    df, generated_csv = score_pairs(pairs, scorer_func, run_label=run_label, log_dir=log_dir)
+    df, generated_csv = score_pairs(
+        pairs,
+        scorer_func,
+        run_label=run_label,
+        log_dir=log_dir,
+    )
     summary = compute_summary(df)
 
     if report_path:
