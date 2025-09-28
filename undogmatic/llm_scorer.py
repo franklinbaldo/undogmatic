@@ -126,16 +126,19 @@ class LLMScorer:
         base_url: Optional[str] = None,
         log_dir: Path | str | None = None,
         max_retries: int = 2,
+        enable_cache: bool | None = None,
     ) -> None:
         load_env_file()
         self.provider = provider or os.getenv("LLM_PROVIDER", "openai")
         self.model = model or os.getenv("LLM_MODEL")
         self.api_key = api_key or os.getenv("LLM_API_KEY")
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
-        self.log_dir = Path(log_dir or "runs")
+        self.log_root = Path(log_dir or "runs")
+        self.log_root.mkdir(parents=True, exist_ok=True)
+        self.log_dir = self.log_root / "events"
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_dir = self.log_dir / "cache"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.enable_cache = enable_cache if enable_cache is not None else True
+        self.cache_dir = (self.log_dir / "cache") if self.enable_cache else None
         self.max_retries = max_retries
 
         if client is not None:
@@ -192,7 +195,6 @@ class LLMScorer:
                 continue
 
         assert parsed is not None  # for type checkers
-        self._write_cache(text, parsed)
         self._log_interaction(
             system_prompt,
             user_prompt,
@@ -201,6 +203,7 @@ class LLMScorer:
             metadata,
             success=True,
         )
+        self._write_cache(text, parsed)
         return parsed
 
     def _log_interaction(
@@ -254,10 +257,13 @@ class LLMScorer:
         )
 
     def _cache_path(self, text: str) -> Path:
+        assert self.cache_dir is not None
         digest = sha1(text.encode("utf-8")).hexdigest()
         return self.cache_dir / f"{digest}.json"
 
     def _read_cache(self, text: str) -> ScoreResult | None:
+        if not self.enable_cache or self.cache_dir is None:
+            return None
         cache_path = self._cache_path(text)
         if not cache_path.exists():
             return None
@@ -273,7 +279,10 @@ class LLMScorer:
             return None
 
     def _write_cache(self, text: str, result: ScoreResult) -> None:
+        if not self.enable_cache or self.cache_dir is None:
+            return
         cache_path = self._cache_path(text)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_payload = result.model_dump()
         cache_path.write_text(
             json.dumps(cache_payload, ensure_ascii=False, indent=2), encoding="utf-8"
