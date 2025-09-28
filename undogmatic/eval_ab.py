@@ -1,4 +1,4 @@
-"""A/B evaluation pipeline using the LLM-based ShameScore."""
+"""A/B evaluation pipeline for ShameScore, supporting multiple backends."""
 
 from __future__ import annotations
 
