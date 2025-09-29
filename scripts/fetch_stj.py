@@ -19,7 +19,9 @@ def fetch_stj(url: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=DEFAULT_STJ_URL, help="Página oficial de temas repetitivos do STJ")
+    parser.add_argument(
+        "--url", default=DEFAULT_STJ_URL, help="Página oficial de temas repetitivos do STJ"
+    )
     parser.add_argument("--out", type=pathlib.Path, required=True, help="Arquivo de saída (HTML)")
     args = parser.parse_args()
 
