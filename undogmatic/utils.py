@@ -26,3 +26,4 @@ def cleanse_tese(text: str) -> str:
     without_theme = THEME_PATTERN.sub("", text)
     without_tribunal = TRIBUNAL_PATTERN.sub("", without_theme)
     return normalize_whitespace(without_tribunal)
+

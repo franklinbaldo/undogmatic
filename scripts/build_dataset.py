@@ -89,9 +89,7 @@ def build_ab_pairs(records: Iterable[TemaRecord]) -> List[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw", type=pathlib.Path, required=True, help="Diretório com HTML bruto")
-    parser.add_argument(
-        "--out", type=pathlib.Path, required=True, help="Diretório de saída para JSONL"
-    )
+    parser.add_argument("--out", type=pathlib.Path, required=True, help="Diretório de saída para JSONL")
     args = parser.parse_args()
 
     stf_path = args.raw / "stf.html"

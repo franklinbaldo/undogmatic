@@ -64,7 +64,9 @@ class OpenAIChatClient:
             with self._opener.open(request, timeout=self.timeout) as response:
                 body = response.read()
         except urllib.error.HTTPError as exc:  # pragma: no cover - passthrough
-            raise RuntimeError(f"OpenAI API request failed with status {exc.code}") from exc
+            raise RuntimeError(
+                f"OpenAI API request failed with status {exc.code}"
+            ) from exc
         except urllib.error.URLError as exc:  # pragma: no cover - passthrough
             raise RuntimeError("OpenAI API request failed") from exc
         data = json.loads(body.decode("utf-8"))
