@@ -7,7 +7,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional
+from typing import Any, Callable, Iterable, List, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -32,6 +32,16 @@ def _get_scorer(backend: str) -> Callable:
 
         return score_func
     raise SystemExit(f"Unknown backend: {backend}")
+
+
+def _coerce_result(payload: Any) -> dict:
+    if isinstance(payload, dict):
+        return payload
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump()
+    if hasattr(payload, "dict"):
+        return payload.dict()
+    raise TypeError("Scorer return payload must be dict-like")
 
 
 @dataclass
@@ -73,7 +83,7 @@ def load_pairs(path: Path) -> List[ABPair]:
 
 def score_pairs(
     pairs: Iterable[ABPair],
-    scorer_func: Callable,
+    scorer_func: Callable[..., dict],
     *,
     run_label: Optional[str] = None,
     log_dir: Path,
@@ -93,16 +103,20 @@ def score_pairs(
             authority_res = scorer_func(pair.authority_only)
             explained_res = scorer_func(pair.explained_only)
 
+        authority_payload = _coerce_result(authority_res)
+        explained_payload = _coerce_result(explained_res)
+
         records.append(
             {
                 "id": pair.id,
-                "authority_score": authority_res["shame_score"],
-                "authority_confidence": authority_res["confidence"],
-                "authority_rationale": authority_res["rationale"],
-                "explained_score": explained_res["shame_score"],
-                "explained_confidence": explained_res["confidence"],
-                "explained_rationale": explained_res["rationale"],
-                "delta": authority_res["shame_score"] - explained_res["shame_score"],
+                "authority_score": authority_payload["shame_score"],
+                "authority_confidence": authority_payload["confidence"],
+                "authority_rationale": authority_payload["rationale"],
+                "explained_score": explained_payload["shame_score"],
+                "explained_confidence": explained_payload["confidence"],
+                "explained_rationale": explained_payload["rationale"],
+                "delta": authority_payload["shame_score"]
+                - explained_payload["shame_score"],
             }
         )
 
@@ -165,15 +179,30 @@ def write_report(path: Path, summary: ExperimentSummary, pair_count: int) -> Non
 
 def run(
     input_path: Path,
-    backend: str,
+    backend: str = "embed",
     *,
     report_path: Optional[Path] = None,
     csv_path: Optional[Path] = None,
     run_label: Optional[str] = None,
+    scorer: Optional[Any] = None,
 ) -> tuple[pd.DataFrame, ExperimentSummary, Path]:
-    scorer_func = _get_scorer(backend)
-    log_dir = Path("runs")
-    log_dir.mkdir(exist_ok=True)
+    if scorer is not None:
+        if hasattr(scorer, "score_text"):
+            scorer_func = scorer.score_text  # type: ignore[assignment]
+        elif callable(scorer):
+            scorer_func = scorer  # type: ignore[assignment]
+        else:  # pragma: no cover - defensive branch
+            raise TypeError("scorer must be callable or expose a score_text method")
+        log_dir_value = getattr(scorer, "log_dir", "runs")
+        if log_dir_value is None:
+            log_dir = Path("runs")
+        else:
+            log_dir = Path(log_dir_value)
+    else:
+        scorer_func = _get_scorer(backend)
+        log_dir = Path("runs")
+
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     pairs = load_pairs(input_path)
     df, generated_csv = score_pairs(pairs, scorer_func, run_label=run_label, log_dir=log_dir)
