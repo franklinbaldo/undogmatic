@@ -36,7 +36,7 @@ def test_score_text_logs_and_parses(tmp_path: Path) -> None:
 
     assert result.shame_score == 70
     assert result.confidence == 80
-    date_dirs = list(tmp_path.iterdir())
+    date_dirs = [path for path in tmp_path.iterdir() if path.is_dir() and path.name != "cache"]
     assert date_dirs, "expected log directory to be created"
     prompt_path = next(date_dirs[0].rglob("prompt.json"))
     response_path = next(date_dirs[0].rglob("response.json"))

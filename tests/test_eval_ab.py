@@ -19,14 +19,33 @@ class StaticClient:
 
 
 def test_score_pairs_creates_csv(tmp_path: Path) -> None:
-    scorer = LLMScorer(client=StaticClient(50.0), log_dir=tmp_path)
+    def simple_scorer(text: str) -> dict:
+        return {"shame_score": 10.0, "confidence": 90.0, "rationale": text}
+
     pairs = [ABPair(id="X", authority_only="A", explained_only="B")]
-    df, csv_path = score_pairs(pairs, scorer, run_label="unit-test")
+    df, csv_path = score_pairs(
+        pairs,
+        simple_scorer,
+        run_label="unit-test",
+        log_dir=tmp_path,
+    )
 
     assert csv_path.exists()
     assert "unit-test" in csv_path.name
     assert isinstance(df, pd.DataFrame)
     assert df.loc[0, "delta"] == 0
+
+
+def test_score_pairs_uses_scorer_log_dir(tmp_path: Path) -> None:
+    scorer_log_dir = tmp_path / "scorer-logs"
+    scorer = LLMScorer(client=StaticClient(55.0), log_dir=scorer_log_dir)
+    pairs = [ABPair(id="Y", authority_only="A", explained_only="B")]
+
+    df, csv_path = score_pairs(pairs, scorer, run_label="default-dir")
+
+    assert csv_path.exists()
+    assert csv_path.parent.parent == scorer_log_dir
+    assert df.loc[0, "authority_score"] == df.loc[0, "explained_score"] == 55.0
 
 
 def test_compute_summary_handles_empty_dataframe() -> None:
@@ -56,6 +75,7 @@ def test_run_writes_report_and_csv(tmp_path: Path) -> None:
         report_path=report_path,
         csv_path=csv_path,
         scorer=scorer,
+        backend="llm",
         run_label="integration",
     )
 
