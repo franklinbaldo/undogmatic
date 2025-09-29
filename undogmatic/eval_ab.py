@@ -34,6 +34,16 @@ def _get_scorer(backend: str) -> Callable:
     raise SystemExit(f"Unknown backend: {backend}")
 
 
+def _coerce_result(payload: Any) -> dict:
+    if isinstance(payload, dict):
+        return payload
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump()
+    if hasattr(payload, "dict"):
+        return payload.dict()
+    raise TypeError("Scorer return payload must be dict-like")
+
+
 @dataclass
 class ABPair:
     """Container for a single STF/STJ thesis pair."""
@@ -109,11 +119,15 @@ def score_pairs(
     else:
         scorer_callable = scorer
 
-    resolved_log_dir = Path(
-        log_dir
-        if log_dir is not None
-        else getattr(scorer, "log_dir", Path("runs"))
-    )
+    if log_dir is not None:
+        resolved_log_dir = Path(log_dir)
+    else:
+        log_dir_value = getattr(scorer, "log_dir", None)
+        if log_dir_value is None:
+            resolved_log_dir = Path("runs")
+        else:
+            resolved_log_dir = Path(log_dir_value)
+
     resolved_log_dir.mkdir(parents=True, exist_ok=True)
 
     records = []
@@ -129,16 +143,20 @@ def score_pairs(
             metadata={"id": pair.id, "variant": "explained_only"},
         )
 
+        authority_payload = _coerce_result(authority_res)
+        explained_payload = _coerce_result(explained_res)
+
         records.append(
             {
                 "id": pair.id,
-                "authority_score": authority_res["shame_score"],
-                "authority_confidence": authority_res["confidence"],
-                "authority_rationale": authority_res["rationale"],
-                "explained_score": explained_res["shame_score"],
-                "explained_confidence": explained_res["confidence"],
-                "explained_rationale": explained_res["rationale"],
-                "delta": authority_res["shame_score"] - explained_res["shame_score"],
+                "authority_score": authority_payload["shame_score"],
+                "authority_confidence": authority_payload["confidence"],
+                "authority_rationale": authority_payload["rationale"],
+                "explained_score": explained_payload["shame_score"],
+                "explained_confidence": explained_payload["confidence"],
+                "explained_rationale": explained_payload["rationale"],
+                "delta": authority_payload["shame_score"]
+                - explained_payload["shame_score"],
             }
         )
 
@@ -208,9 +226,14 @@ def run(
     run_label: Optional[str] = None,
     scorer: Optional[Callable[[str], Mapping[str, Any]] | SupportsScoreText] = None,
 ) -> tuple[pd.DataFrame, ExperimentSummary, Path]:
-    scorer_impl = scorer or _get_scorer(backend)
+    if scorer is None:
+        scorer_impl: Callable[[str], Mapping[str, Any]] | SupportsScoreText = _get_scorer(backend)
+        log_dir_override: Optional[Path] = Path("runs")
+    else:
+        scorer_impl = scorer
+        log_dir_override = None
+
     pairs = load_pairs(input_path)
-    log_dir_override = None if scorer is not None else Path("runs")
     df, generated_csv = score_pairs(
         pairs,
         scorer_impl,

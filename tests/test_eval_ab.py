@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -55,9 +57,8 @@ def test_compute_summary_handles_empty_dataframe() -> None:
     assert pd.isna(summary.rank_biserial)
 
 
-def test_run_writes_report_and_csv(tmp_path: Path) -> None:
-    ab_path = tmp_path / "pairs.jsonl"
-    ab_path.write_text(
+def _write_pairs(path: Path) -> None:
+    path.write_text(
         "\n".join(
             [
                 json.dumps({"id": "1", "authority_only": "A", "explained_only": "B"}),
@@ -66,21 +67,55 @@ def test_run_writes_report_and_csv(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def test_run_with_injected_scorer(tmp_path: Path) -> None:
+    ab_path = tmp_path / "pairs.jsonl"
+    _write_pairs(ab_path)
     report_path = tmp_path / "report.md"
     csv_path = tmp_path / "results.csv"
     scorer = LLMScorer(client=StaticClient(40.0), log_dir=tmp_path / "runs")
 
-    df, summary, generated_csv = run(
-        ab_path,
-        report_path=report_path,
-        csv_path=csv_path,
-        scorer=scorer,
-        backend="llm",
-        run_label="integration",
-    )
+    with patch("undogmatic.eval_ab._get_scorer", side_effect=AssertionError):
+        df, summary, generated_csv = run(
+            ab_path,
+            report_path=report_path,
+            csv_path=csv_path,
+            scorer=scorer,
+            backend="llm",
+            run_label="integration",
+        )
 
     assert report_path.exists()
     assert csv_path.exists()
     assert generated_csv.exists()
     assert len(df) == 2
     assert summary.authority_mean == summary.explained_mean == 40.0
+    assert (tmp_path / "runs").is_dir()
+    assert scorer.log_dir in generated_csv.parents
+
+
+def test_run_uses_default_backend_when_no_scorer(tmp_path: Path) -> None:
+    ab_path = tmp_path / "pairs.jsonl"
+    _write_pairs(ab_path)
+
+    def fake_scorer(text: str, metadata: dict | None = None) -> dict:
+        variant = metadata.get("variant") if metadata else None
+        score = 60 if variant == "authority_only" else 40
+        return {"shame_score": score, "confidence": 99, "rationale": "stub"}
+
+    with patch("undogmatic.eval_ab._get_scorer", return_value=fake_scorer) as mock_get:
+        cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            df, summary, generated_csv = run(ab_path)
+        finally:
+            os.chdir(cwd)
+
+    assert mock_get.called
+    assert not df.empty
+    assert summary.authority_mean == 60
+    assert summary.explained_mean == 40
+    assert (tmp_path / "runs").is_dir()
+    resolved_csv = generated_csv if generated_csv.is_absolute() else (tmp_path / generated_csv)
+    assert resolved_csv.is_relative_to(tmp_path / "runs")
