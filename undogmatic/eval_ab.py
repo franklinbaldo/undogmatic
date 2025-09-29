@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from inspect import Parameter, signature
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Protocol
@@ -90,21 +91,29 @@ class SupportsScoreText(Protocol):
         ...
 
 
+def _scorer_accepts_metadata(scorer_callable: Callable[..., Any]) -> bool:
+    """Return True if the callable accepts a ``metadata`` keyword."""
+
+    try:
+        sig = signature(scorer_callable)
+    except (TypeError, ValueError):  # pragma: no cover - uncommon for pure Python callables
+        return False
+
+    for param in sig.parameters.values():
+        if param.kind is Parameter.VAR_KEYWORD:
+            return True
+    return "metadata" in sig.parameters
+
+
 def _call_scorer(
     scorer_callable: Callable[..., Any], text: str, metadata: Optional[dict]
 ) -> Mapping[str, Any]:
-    try:
-        result = scorer_callable(text, metadata=metadata)
-    except TypeError:
+    if metadata is None:
         result = scorer_callable(text)
+    else:
+        result = scorer_callable(text, metadata=metadata)
 
-    if isinstance(result, Mapping):
-        return result
-    if hasattr(result, "model_dump"):
-        return result.model_dump()
-    if hasattr(result, "dict"):
-        return result.dict()
-    raise TypeError("Scorer result must be mapping-like")
+    return _coerce_result(result)
 
 
 def score_pairs(
@@ -119,6 +128,8 @@ def score_pairs(
     else:
         scorer_callable = scorer
 
+    accepts_metadata = _scorer_accepts_metadata(scorer_callable)
+
     if log_dir is not None:
         resolved_log_dir = Path(log_dir)
     else:
@@ -132,31 +143,33 @@ def score_pairs(
 
     records = []
     for pair in pairs:
+        authority_metadata = (
+            {"id": pair.id, "variant": "authority_only"} if accepts_metadata else None
+        )
         authority_res = _call_scorer(
             scorer_callable,
             pair.authority_only,
-            metadata={"id": pair.id, "variant": "authority_only"},
+            metadata=authority_metadata,
+        )
+        explained_metadata = (
+            {"id": pair.id, "variant": "explained_only"} if accepts_metadata else None
         )
         explained_res = _call_scorer(
             scorer_callable,
             pair.explained_only,
-            metadata={"id": pair.id, "variant": "explained_only"},
+            metadata=explained_metadata,
         )
-
-        authority_payload = _coerce_result(authority_res)
-        explained_payload = _coerce_result(explained_res)
 
         records.append(
             {
                 "id": pair.id,
-                "authority_score": authority_payload["shame_score"],
-                "authority_confidence": authority_payload["confidence"],
-                "authority_rationale": authority_payload["rationale"],
-                "explained_score": explained_payload["shame_score"],
-                "explained_confidence": explained_payload["confidence"],
-                "explained_rationale": explained_payload["rationale"],
-                "delta": authority_payload["shame_score"]
-                - explained_payload["shame_score"],
+                "authority_score": authority_res["shame_score"],
+                "authority_confidence": authority_res["confidence"],
+                "authority_rationale": authority_res["rationale"],
+                "explained_score": explained_res["shame_score"],
+                "explained_confidence": explained_res["confidence"],
+                "explained_rationale": explained_res["rationale"],
+                "delta": authority_res["shame_score"] - explained_res["shame_score"],
             }
         )
 
