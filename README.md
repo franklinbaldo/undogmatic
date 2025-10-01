@@ -51,7 +51,8 @@ undogmatic/
 │       ├── ab_pairs.jsonl        # saídas do script make_ab_pairs
 │       └── control_samples.jsonl # frases neutras/hubristas p/ ancoragem
 ├── reports/
-│   └── ab_test.md           # resumo do experimento
+│   ├── ab_test.md           # resumo do experimento
+│   └── authority_reliance_index.md  # whitepaper sobre o Authority-Reliance Index (ARI)
 ├── tests/
 │   └── test_llm_scorer.py   # testes rápidos de parsing JSON e anchors
 ├── README.md
@@ -106,6 +107,11 @@ e `top_p=1.0` para reprodutibilidade. Caso utilize um proxy ou Azure OpenAI, aju
 
 > `scripts/run_ab_test.py` permanece no repositório apenas por retrocompatibilidade; utilize o comando
 > `python -m undogmatic.eval_ab` descrito acima como caminho canônico.
+
+## Documentação complementar
+
+- [Authority-Reliance Index (ARI)](reports/authority_reliance_index.md): whitepaper exploratório sobre o índice que quantifica
+  padrões de dependência em autoridade versus explicação em textos jurídicos brasileiros.
 
 ## Testes
 
