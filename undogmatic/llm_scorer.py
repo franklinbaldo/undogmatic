@@ -132,8 +132,8 @@ class LLMScorer:
         self.base_url = base_url or os.getenv("LLM_BASE_URL")
         self.log_dir = Path(log_dir or "runs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_dir = self.log_dir / "cache"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir_name = f"{self.log_dir.name}_cache"
+        self.cache_dir = (self.log_dir.parent / cache_dir_name).resolve()
         self.max_retries = max_retries
 
         if client is not None:
@@ -190,7 +190,6 @@ class LLMScorer:
                 continue
 
         assert parsed is not None  # for type checkers
-        self._write_cache(text, parsed)
         self._log_interaction(
             system_prompt,
             user_prompt,
@@ -199,6 +198,7 @@ class LLMScorer:
             metadata,
             success=True,
         )
+        self._write_cache(text, parsed)
         return parsed
 
     def _log_interaction(
@@ -256,6 +256,8 @@ class LLMScorer:
         return self.cache_dir / f"{digest}.json"
 
     def _read_cache(self, text: str) -> ScoreResult | None:
+        if not self.cache_dir.exists():
+            return None
         cache_path = self._cache_path(text)
         if not cache_path.exists():
             return None
@@ -272,6 +274,7 @@ class LLMScorer:
 
     def _write_cache(self, text: str, result: ScoreResult) -> None:
         cache_path = self._cache_path(text)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_payload = result.model_dump()
         cache_path.write_text(
             json.dumps(cache_payload, ensure_ascii=False, indent=2), encoding="utf-8"
