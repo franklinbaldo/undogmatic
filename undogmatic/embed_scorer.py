@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import os
+
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
@@ -11,11 +13,13 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # ---- Model load (once) ----
 _model = SentenceTransformer(MODEL_ID, device=DEVICE)
 
+
 def _embed(text: str | list[str]) -> np.ndarray:
     """Return a normalized sentence embedding."""
     # The model.encode method handles tokenization, pooling, and normalization
     embedding = _model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
     return embedding
+
 
 # ---- Prototypes (Portuguese, tiny seed; edit freely) ----
 _HUBRIS_PT = [
@@ -31,6 +35,7 @@ _HUMILITY_PT = [
 _PROTO_HUBRIS = np.mean(_embed(_HUBRIS_PT), axis=0)
 _PROTO_HUMILI = np.mean(_embed(_HUMILITY_PT), axis=0)
 
+
 def score_text(text: str) -> dict:
     """
     Zero-shot prototype scoring:
@@ -39,7 +44,7 @@ def score_text(text: str) -> dict:
     v = _embed(text)
     s_hub = float(np.dot(v, _PROTO_HUBRIS))
     s_hum = float(np.dot(v, _PROTO_HUMILI))
-    raw = 0.5 * (s_hub - s_hum + 1.0)             # map [-1,1] -> [0,1]
+    raw = 0.5 * (s_hub - s_hum + 1.0)  # map [-1,1] -> [0,1]
     score = int(round(100 * max(0.0, min(1.0, raw))))
     rationale = f"Local embedding score via prototypes (hubris={s_hub:.3f}, humility={s_hum:.3f})"
     return {"shame_score": score, "confidence": 80, "rationale": rationale}

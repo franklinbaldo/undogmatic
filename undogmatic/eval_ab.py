@@ -115,8 +115,7 @@ def score_pairs(
                 "explained_score": explained_payload["shame_score"],
                 "explained_confidence": explained_payload["confidence"],
                 "explained_rationale": explained_payload["rationale"],
-                "delta": authority_payload["shame_score"]
-                - explained_payload["shame_score"],
+                "delta": authority_payload["shame_score"] - explained_payload["shame_score"],
             }
         )
 

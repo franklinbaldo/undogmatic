@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from scripts.make_ab_pairs import cleanse_tese, generate_pairs
