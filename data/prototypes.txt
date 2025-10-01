@@ -1,0 +1,2 @@
+# Placeholder for ARI prototype phrases.
+# Populate with Portuguese exemplars representing citation-heavy and explanation-rich patterns.
