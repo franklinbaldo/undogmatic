@@ -110,6 +110,7 @@ e `top_p=1.0` para reprodutibilidade. Caso utilize um proxy ou Azure OpenAI, aju
 
 ## Documentação complementar
 
+- [Visualização de direções de ShameScore](docs/shame_direction_visualization.md): guia prático para construir heatmaps de tokens usando modelos locais ou APIs hospedadas.
 - [Authority-Reliance Index (ARI)](reports/authority_reliance_index.md): whitepaper exploratório sobre o índice que quantifica
   padrões de dependência em autoridade versus explicação em textos jurídicos brasileiros.
 
