@@ -107,7 +107,7 @@ def color_for_score(score: float) -> str:
 def render_html(text: str, offsets: Sequence[Sequence[int]], scores: Sequence[float]) -> str:
     parts: List[str] = []
     cursor = 0
-    for (start, end), score in zip(offsets, scores):
+    for (start, end), score in zip(offsets, scores, strict=False):
         start = max(0, min(len(text), start))
         end = max(0, min(len(text), end))
         if end <= start:
