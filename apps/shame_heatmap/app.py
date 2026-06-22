@@ -1,4 +1,5 @@
 """Gradio app to visualize token similarity to a shame direction."""
+
 from __future__ import annotations
 
 import html
@@ -88,7 +89,9 @@ def cached_banks(language: str) -> Dict[str, List[str]]:
     return load_banks(bank_path)
 
 
-def normalize_scores(scores: np.ndarray, percentile_low: float, percentile_high: float) -> np.ndarray:
+def normalize_scores(
+    scores: np.ndarray, percentile_low: float, percentile_high: float
+) -> np.ndarray:
     low = np.percentile(scores, percentile_low)
     high = np.percentile(scores, percentile_high)
     if high - low < 1e-8:
@@ -107,7 +110,7 @@ def color_for_score(score: float) -> str:
 def render_html(text: str, offsets: Sequence[Sequence[int]], scores: Sequence[float]) -> str:
     parts: List[str] = []
     cursor = 0
-    for (start, end), score in zip(offsets, scores):
+    for (start, end), score in zip(offsets, scores, strict=False):
         start = max(0, min(len(text), start))
         end = max(0, min(len(text), end))
         if end <= start:
@@ -128,7 +131,9 @@ def render_html(text: str, offsets: Sequence[Sequence[int]], scores: Sequence[fl
     return "".join(parts)
 
 
-def shame_vector(encoder: Encoder, banks: Dict[str, Iterable[str]], alpha: float, delta: float) -> np.ndarray:
+def shame_vector(
+    encoder: Encoder, banks: Dict[str, Iterable[str]], alpha: float, delta: float
+) -> np.ndarray:
     embarrassing = encoder.sentence_embeddings(banks["embarrassing_style"]).mean(axis=0)
     professional = encoder.sentence_embeddings(banks["professional_style"]).mean(axis=0)
     anti_values = encoder.sentence_embeddings(banks["anti_values"]).mean(axis=0)
@@ -175,7 +180,7 @@ def app_function(
         "font-family:ui-monospace,monospace;white-space:pre-wrap;border:1px solid #eee;"
         "border-radius:8px;padding:12px;background:#fafafa;"
     )
-    return f"<div style=\"{container_style}\">{rendered}</div>"
+    return f'<div style="{container_style}">{rendered}</div>'
 
 
 def build_demo() -> gr.Blocks:

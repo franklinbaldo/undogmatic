@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-SYSTEM_PROMPT = dedent(
-    """
+SYSTEM_PROMPT = dedent("""
     Você é um avaliador jurídico rigoroso. Sua tarefa é medir o quanto um trecho
     incorre em "hubris": quando ele apela à autoridade (cita tribunal/tema/súmula)
     como substituto de análise ou justificativa.
@@ -18,15 +17,13 @@ SYSTEM_PROMPT = dedent(
       condições ou comparação com casos concretos.
     - Responda ESTRITAMENTE em JSON com as chaves: shame_score, confidence,
       rationale (1–2 frases).
-    """
-).strip()
+    """).strip()
 
 
 def render_user_prompt(text: str) -> str:
     """Render the user-facing prompt inserting the text to be evaluated."""
 
-    return dedent(
-        f"""
+    return dedent(f"""
         Avalie o texto abaixo. Produza apenas JSON.
 
         Escala ancorada:
@@ -40,5 +37,4 @@ def render_user_prompt(text: str) -> str:
 
         Texto:
         "{text}"
-        """
-    ).strip()
+        """).strip()
